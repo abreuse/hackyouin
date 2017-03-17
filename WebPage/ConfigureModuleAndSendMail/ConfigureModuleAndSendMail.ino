@@ -1,6 +1,7 @@
 #include <SPI.h>
 #include <MFRC522.h>
 #include <ESP8266WiFi.h>
+#include <HttpClient.h>
 #include <WiFiClient.h>
 #include <WiFiManager.h>          
 #include <ESP8266mDNS.h>
@@ -21,6 +22,7 @@ char name[100];
 char surname[100];
 char email[100];
 char password[100];
+char frequence[100];
 char publicKey[200];
 char privateKey[200];
 char deleteKey[200];
@@ -53,6 +55,7 @@ String rootHTML = "\
   <br> Surname : <br> <input type='text' name='surname' />\
   <br> Ssid : <br> <input type='text' name='ssid' />\
   <br> Password : <br> <input type='password' name='password' />\
+  <br> Sending Frequency : <br> <input type='text' name='freq' />\
   <br><br> <input type='submit' name='register' />\
 </form>\
 </body> </html>\
@@ -62,7 +65,7 @@ String sparkFunPage = "\
 <!doctype html> <html> <head> <title> sparkFun Form </title> </head> <body>\
 <h1> Hack You In </h1>\
 <div> Congrats! You have now setup your device. To see the data collected, you have to do one more thing. <br> Go to \
-<a> href = https:/\/data.sparkfun.com/streams/make </a> <br> Don't freak out I'm here to help. You will need to give a title and a description to your data. \
+<a href = 'https://data.sparkfun.com/streams/make'> GetKeys </a> <br> Don't freak out I'm here to help. You will need to give a title and a description to your data. \
 The next field should be set to 'visible'. <br>\
 After that you'll have to add 'date, uid, type' on the Fields field. you can give an Alias to your stream. <br>\
 You can now hit  'Save' and complete the form below</div>\
@@ -74,22 +77,28 @@ You can now hit  'Save' and complete the form below</div>\
 </form>\
 </body> </html>\
 ";
-
+String okPage ="\
+<!doctype html> <html> <head> <title> validate </title> </head> <body>\
+<h1> Hack You In </h1>\
+<div> you can start scanning <div>\
+</body> </html>\
+";
 void handleRoot() {
     server.send(200, "text/html", rootHTML);
 }
 
 void handleForm(){
-  server.send(200, "<h1> Register </h1>");
+  server.send(200, "text/html", sparkFunPage);
   server.arg(0).toCharArray(email, 100);
   server.arg(1).toCharArray(name, 100);
   server.arg(2).toCharArray(surname, 100);
   server.arg(3).toCharArray(serviceSetIdentifier, 100);
   server.arg(4).toCharArray(password, 100);
+  server.arg(5).toCharArray(frequence, 100);
 }
 
 void handleKeys(){
-  server.send(200, "<h1> Sending </h1>");
+  server.send(200, "text/html", okPage);
 
   server.argName(0).toCharArray(publicKey, 100);
   server.argName(1).toCharArray(privateKey, 100);
@@ -227,7 +236,7 @@ void loop() {
   }
     
   timer = millis();
-  if(timer > (prevTimer + 90000))
+  if(timer > (prevTimer + frequence))
   {
     prevTimer = millis();
     sendMail();
@@ -260,6 +269,27 @@ void scanRFID() {
   }
   else
   {
+  String url ="http://data.sparkfun.com/input/";
+  url += publicKey;
+  url += "?private_key=";
+  url += privateKey;
+  url += "&date=";
+  url += millis();
+  url += "&uid=";
+  url += scannedRfid.UID;
+  url += "type=";
+  url += scannedRfid.type;
+
+  HttpClient client;
+  client.get(url);
+
+  while (client.available()) {
+    char c = client.read();
+    Serial.print(c);
+  }
+  Serial.flush();
+
+  delay(5000);
     appendRFIDToFile(scannedRfid, pathFile);
   }
   
@@ -292,6 +322,9 @@ void sendMail()
   
   Gsender *gsender = Gsender::Instance();
   String subject = "Your RFIDS";
+
+}
+  
   
   if (gsender->Subject(subject)->Send(email, RFIDS)) 
   {
