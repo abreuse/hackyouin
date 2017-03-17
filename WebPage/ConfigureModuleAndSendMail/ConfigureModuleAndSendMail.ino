@@ -22,7 +22,7 @@ char name[100];
 char surname[100];
 char email[100];
 char password[100];
-char frequence[100];
+int frequence;
 char publicKey[200];
 char privateKey[200];
 char deleteKey[200];
@@ -89,12 +89,12 @@ void handleRoot() {
 
 void handleForm(){
   server.send(200, "text/html", sparkFunPage);
-  server.arg(0).toCharArray(email, 100);
-  server.arg(1).toCharArray(name, 100);
-  server.arg(2).toCharArray(surname, 100);
-  server.arg(3).toCharArray(serviceSetIdentifier, 100);
-  server.arg(4).toCharArray(password, 100);
-  server.arg(5).toCharArray(frequence, 100);
+  server.argName(0).toCharArray(email, 100);
+  server.argName(1).toCharArray(name, 100);
+  server.argName(2).toCharArray(surname, 100);
+  server.argName(3).toCharArray(serviceSetIdentifier, 100);
+  server.argName(4).toCharArray(password, 100);
+  frequence = server.argName(5).toInt();
 }
 
 void handleKeys(){
