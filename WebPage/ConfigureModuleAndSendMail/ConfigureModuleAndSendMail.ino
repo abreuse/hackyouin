@@ -14,16 +14,19 @@
 
 #pragma region Globals
 ESP8266WebServer server(80);
-const char *AP_ssid = "Module_RFID";
-const char *AP_pwd = "Module_RFID";
+const char *AP_ssid = "module";
+//const char *AP_pwd = "Module_RFID";
 char serviceSetIdentifier[100];
 char name[100];
 char surname[100];
 char email[100];
 char password[100];
+char publicKey[200];
+char privateKey[200];
+char deleteKey[200];
 
-unsigned long timer;
-unsigned long prevTimer;
+unsigned long timer = 0;
+unsigned long prevTimer = 0;
 const char* ssid_to_connect = "HotspotRFID";
 const char* password_to_connect = "hotspotRFID";
 uint8_t connection_state = 0;
@@ -55,6 +58,23 @@ String rootHTML = "\
 </body> </html>\
 ";
 
+String sparkFunPage = "\
+<!doctype html> <html> <head> <title> sparkFun Form </title> </head> <body>\
+<h1> Hack You In </h1>\
+<div> Congrats! You have now setup your device. To see the data collected, you have to do one more thing. <br> Go to \
+<a> href = https:/\/data.sparkfun.com/streams/make </a> <br> Don't freak out I'm here to help. You will need to give a title and a description to your data. \
+The next field should be set to 'visible'. <br>\
+After that you'll have to add 'date, uid, type' on the Fields field. you can give an Alias to your stream. <br>\
+You can now hit  'Save' and complete the form below</div>\
+<form method='post' action'/handleKeys'>\
+  <br> Public Key : <input type 'text' name='plubliKey' />\
+  <br> Private Key : <input type='text' name='privateKey' />\
+  <br> Delete Key : <input type='text' name='deleteKey' />\
+  <br><br> <button type='submit' name='send' > Send </button>\
+</form>\
+</body> </html>\
+";
+
 void handleRoot() {
     server.send(200, "text/html", rootHTML);
 }
@@ -68,11 +88,19 @@ void handleForm(){
   server.arg(4).toCharArray(password, 100);
 }
 
+void handleKeys(){
+  server.send(200, "<h1> Sending </h1>");
+
+  server.argName(0).toCharArray(publicKey, 100);
+  server.argName(1).toCharArray(privateKey, 100);
+  server.argName(2).toCharArray(deleteKey, 100);  
+}
+
 void setupWifi() {
     WiFiManager wifiManager;
 
     wifiManager.resetSettings();
-    wifiManager.autoConnect(AP_ssid, AP_pwd);
+    wifiManager.autoConnect(AP_ssid);
 
     Serial.println("local ip");
     Serial.println(WiFi.localIP());
@@ -81,6 +109,7 @@ void setupWifi() {
 void setupServer() {
     server.on("/", handleRoot);
     server.on("/register", handleForm);
+    server.on("/handleKeys", handleKeys);
     server.begin();
     Serial.println("HTTP server started");
 }
@@ -163,7 +192,6 @@ uint8_t WiFiConnect(const char* nSSID = nullptr, const char* nPassword = nullptr
     WiFi.begin(nSSID, nPassword);
     Serial.println(nSSID);
   } else {
-    //WiFi.begin(ssid_to_connect, password_to_connect);
     WiFi.begin(serviceSetIdentifier, password);
     Serial.println(serviceSetIdentifier);
   }
@@ -171,9 +199,9 @@ uint8_t WiFiConnect(const char* nSSID = nullptr, const char* nPassword = nullptr
     uint8_t i = 0;
     while(WiFi.status()!= WL_CONNECTED && i++ < 50)
     {
-    delay(200);
-    Serial.print(".");
-  }
+      delay(200);
+      Serial.print(".");
+    }
     ++attempt;
     Serial.println("");
     if(i == 51) {
@@ -195,14 +223,11 @@ void loop() {
   server.handleClient();
   if(email[0] == 0)
   {
-    Serial.println("email == 0");
     return;
   }
     
-
-  Serial.println("going on for scan");
   timer = millis();
-  if(timer > (prevTimer + 30000))
+  if(timer > (prevTimer + 90000))
   {
     prevTimer = millis();
     sendMail();
@@ -236,7 +261,6 @@ void scanRFID() {
   else
   {
     appendRFIDToFile(scannedRfid, pathFile);
-    //sendMail();
   }
   
 }
@@ -246,10 +270,9 @@ bool RfidAlreadyScanned(rfid scannedRfid)
 {
   for(int i = 0; i < rfids.size(); i++)
   {
-    Serial.println("UID in array : " + rfids[i].UID);
     if(scannedRfid.UID == rfids[i].UID)
     {
-      Serial.println("RFIDS already scanned");
+      Serial.println("RFID already scanned");
       return true;
     }
   }
@@ -263,6 +286,7 @@ void sendMail()
   connection_state = WiFiConnect();
   if (!connection_state)
     Awaits();
+
     
   String RFIDS = readUidsFromFile(pathFile);
   
